@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Enforce fluid stable viewport grid and disable horizontal scroll completely */
+html {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable; /* Reserves space for scrollbars to eliminate page shifting / jumping */
+}
+
+body, #root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden !important;
+}
+
+body {
+  background-color: #f8fafc; /* Slate-50 */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scroll adjustments: Allow vertical scrolling, hide horizontal scrollbar completely */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 0px; /* Disable horizontal webkit scrollbar track */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Slate-300 */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Slate-400 */
+}
+
+* {
+  box-sizing: border-box;
+}

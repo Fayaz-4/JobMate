@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+backend/target/
+frontend/dist/
+
+# IDE and configuration
+.idea/
+*.iml
+.vscode/
+backend/.classpath
+backend/.project
+backend/.factorypath
+backend/.settings/
+
+# Misc
+*.log
+.env
+backend/uploads/
