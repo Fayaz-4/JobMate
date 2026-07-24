@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  getApplications, 
-  createApplication, 
-  updateApplication, 
-  deleteApplication 
+import {
+  getApplications,
+  createApplication,
+  updateApplication,
+  deleteApplication
 } from '../../services/applicationService';
 
 const Applications = () => {
@@ -14,30 +14,24 @@ const Applications = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [dateSort, setDateSort] = useState('newest'); // 'newest' | 'oldest'
+  const [dateSort, setDateSort] = useState('newest');
 
-  // Modals state
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
 
-  // Form Fields State
   const [formFields, setFormFields] = useState({
     companyName: '',
     jobTitle: '',
     applicationSource: 'LinkedIn',
     appliedDate: new Date().toISOString().split('T')[0],
-    status: 'Applied',
-    currentRound: 'None',
     notes: '',
     applicationUrl: ''
   });
 
-  // Load active tab from URL search parameters (?tab=interview etc.)
   const tabParam = searchParams.get('tab') || 'all';
   const activeTab = tabParam.toLowerCase();
 
@@ -79,49 +73,28 @@ const Applications = () => {
     setSearchParams({ tab: tabName });
   };
 
-  // Summary counts
   const totalApps = applications.length;
   const appliedApps = applications.filter(a => a.status === 'Applied').length;
-  const interviewScheduledApps = applications.filter(a => a.status === 'Interview Scheduled').length;
-  const interviewCompletedApps = applications.filter(a => a.status === 'Interview Completed').length;
-  const selectedApps = applications.filter(a => a.status === 'Selected').length;
-  const rejectedApps = applications.filter(a => a.status === 'Rejected').length;
-  const offerReceivedApps = applications.filter(a => a.status === 'Offer Received').length;
 
-  // Filter & Search Logic
   const getFilteredApplications = () => {
     let result = [...applications];
 
-    // 1. Search Query filter (Company / Role)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      result = result.filter(a => 
-        a.companyName.toLowerCase().includes(query) || 
+      result = result.filter(a =>
+        a.companyName.toLowerCase().includes(query) ||
         a.jobTitle.toLowerCase().includes(query)
       );
     }
 
-    // 2. Status Dropdown filter
     if (statusFilter !== 'All') {
       result = result.filter(a => a.status === statusFilter);
     }
 
-    // 3. Horizontal Status Tabs filter
     if (activeTab === 'applied') {
       result = result.filter(a => a.status === 'Applied');
-    } else if (activeTab === 'interview_scheduled') {
-      result = result.filter(a => a.status === 'Interview Scheduled');
-    } else if (activeTab === 'interview_completed') {
-      result = result.filter(a => a.status === 'Interview Completed');
-    } else if (activeTab === 'selected') {
-      result = result.filter(a => a.status === 'Selected');
-    } else if (activeTab === 'rejected') {
-      result = result.filter(a => a.status === 'Rejected');
-    } else if (activeTab === 'offer_received') {
-      result = result.filter(a => a.status === 'Offer Received');
     }
 
-    // 4. Date Sorting
     result.sort((a, b) => {
       const dateA = new Date(a.appliedDate);
       const dateB = new Date(b.appliedDate);
@@ -133,7 +106,6 @@ const Applications = () => {
 
   const filteredAppsList = getFilteredApplications();
 
-  // CRUD actions
   const openAddModal = () => {
     setIsEditMode(false);
     setSelectedApp(null);
@@ -142,8 +114,6 @@ const Applications = () => {
       jobTitle: '',
       applicationSource: 'LinkedIn',
       appliedDate: new Date().toISOString().split('T')[0],
-      status: 'Applied',
-      currentRound: 'None',
       notes: '',
       applicationUrl: ''
     });
@@ -158,8 +128,6 @@ const Applications = () => {
       jobTitle: app.jobTitle,
       applicationSource: app.applicationSource,
       appliedDate: app.appliedDate,
-      status: app.status,
-      currentRound: app.currentRound,
       notes: app.notes || '',
       applicationUrl: app.applicationUrl || ''
     });
@@ -183,19 +151,24 @@ const Applications = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    
+
     if (!formFields.companyName.trim() || !formFields.jobTitle.trim()) {
       setError('Company Name and Job Title are required.');
       return;
     }
 
     try {
+      const payload = {
+        ...formFields,
+        status: 'Applied',
+      };
+
       if (isEditMode && selectedApp) {
-        const updated = await updateApplication(selectedApp.id, formFields);
+        const updated = await updateApplication(selectedApp.id, payload);
         setApplications(prev => prev.map(a => a.id === selectedApp.id ? updated : a));
         setSuccess('Application updated successfully.');
       } else {
-        const created = await createApplication(formFields);
+        const created = await createApplication(payload);
         setApplications(prev => [created, ...prev]);
         setSuccess('Application created successfully.');
       }
@@ -220,30 +193,16 @@ const Applications = () => {
     }
   };
 
-  // Status Styled Badges helper
   const getStatusBadge = (status) => {
-    const base = "inline-flex rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide border ";
-    switch (status) {
-      case 'Selected':
-        return base + "bg-emerald-50 text-emerald-700 border-emerald-150";
-      case 'Rejected':
-        return base + "bg-rose-50 text-rose-700 border-rose-150";
-      case 'Interview Scheduled':
-        return base + "bg-violet-50 text-violet-700 border-violet-150";
-      case 'Interview Completed':
-        return base + "bg-indigo-50 text-indigo-700 border-indigo-150";
-      case 'Offer Received':
-        return base + "bg-amber-50 text-amber-700 border-amber-150";
-      case 'Applied':
-      default:
-        return base + "bg-sky-50 text-sky-700 border-sky-150";
-    }
+    const base = 'inline-flex rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide border ';
+    const styleClass = status === 'Applied'
+      ? 'bg-sky-50 text-sky-700 border-sky-150'
+      : 'bg-slate-50 text-slate-600 border-slate-150';
+    return <span className={base + styleClass}>{status}</span>;
   };
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
-      
-      {/* Sub Header Segment */}
       <div className="border-b border-slate-200 bg-white pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none">
         <div>
           <h1 className="text-xl font-black text-slate-900">Applications Tracker</h1>
@@ -261,7 +220,6 @@ const Applications = () => {
         </div>
       </div>
 
-      {/* Notification banners */}
       {error && (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700 shadow-sm">
           ⚠️ {error}
@@ -273,151 +231,41 @@ const Applications = () => {
         </div>
       )}
 
-      {/* Summary KPI Cards Grid (Clickable) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {/* TOTAL */}
-        <div 
-          onClick={() => handleTabChange('all')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'all' ? 'border-slate-500 ring-2 ring-slate-100' : 'border-slate-200'}`}
-        >
-          <span className="text-slate-450 text-[9px] font-black uppercase tracking-wider">Total</span>
-          <span className="text-2xl font-black text-slate-900 mt-2">{totalApps}</span>
-          <p className="text-[9px] font-bold text-slate-500 mt-2">All →</p>
-        </div>
-
-        {/* APPLIED */}
-        <div 
-          onClick={() => handleTabChange('applied')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'applied' ? 'border-sky-500 ring-2 ring-sky-100' : 'border-slate-200'}`}
-        >
-          <span className="text-sky-500 text-[9px] font-black uppercase tracking-wider">Applied</span>
-          <span className="text-2xl font-black text-sky-600 mt-2">{appliedApps}</span>
-          <p className="text-[9px] font-bold text-sky-600 mt-2">Review →</p>
-        </div>
-
-        {/* INTERVIEW SCHEDULED */}
-        <div 
-          onClick={() => handleTabChange('interview_scheduled')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'interview_scheduled' ? 'border-violet-500 ring-2 ring-violet-100' : 'border-slate-200'}`}
-        >
-          <span className="text-violet-500 text-[9px] font-black uppercase tracking-wider">Int Scheduled</span>
-          <span className="text-2xl font-black text-violet-600 mt-2">{interviewScheduledApps}</span>
-          <p className="text-[9px] font-bold text-violet-600 mt-2">Upcoming →</p>
-        </div>
-
-        {/* INTERVIEW COMPLETED */}
-        <div 
-          onClick={() => handleTabChange('interview_completed')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'interview_completed' ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200'}`}
-        >
-          <span className="text-indigo-500 text-[9px] font-black uppercase tracking-wider">Int Completed</span>
-          <span className="text-2xl font-black text-indigo-600 mt-2">{interviewCompletedApps}</span>
-          <p className="text-[9px] font-bold text-indigo-600 mt-2">Done →</p>
-        </div>
-
-        {/* SELECTED */}
-        <div 
-          onClick={() => handleTabChange('selected')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'selected' ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200'}`}
-        >
-          <span className="text-emerald-500 text-[9px] font-black uppercase tracking-wider">Selected</span>
-          <span className="text-2xl font-black text-emerald-600 mt-2">{selectedApps}</span>
-          <p className="text-[9px] font-bold text-emerald-600 mt-2">Success →</p>
-        </div>
-
-        {/* REJECTED */}
-        <div 
-          onClick={() => handleTabChange('rejected')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'rejected' ? 'border-rose-500 ring-2 ring-rose-100' : 'border-slate-200'}`}
-        >
-          <span className="text-rose-500 text-[9px] font-black uppercase tracking-wider">Rejected</span>
-          <span className="text-2xl font-black text-rose-600 mt-2">{rejectedApps}</span>
-          <p className="text-[9px] font-bold text-rose-600 mt-2">Closed →</p>
-        </div>
-
-        {/* OFFER RECEIVED */}
-        <div 
-          onClick={() => handleTabChange('offer_received')}
-          className={`rounded-3xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer transition duration-200 hover:scale-[1.01] bg-white ${activeTab === 'offer_received' ? 'border-amber-500 ring-2 ring-amber-100' : 'border-slate-200'}`}
-        >
-          <span className="text-amber-500 text-[9px] font-black uppercase tracking-wider">Offers</span>
-          <span className="text-2xl font-black text-amber-600 mt-2">{offerReceivedApps}</span>
-          <p className="text-[9px] font-bold text-amber-600 mt-2">Rewards →</p>
-        </div>
+      <div className="sr-only">
+        <label>Search</label>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="All">All Statuses</option>
+          <option value="Applied">Applied</option>
+        </select>
+        <select value={dateSort} onChange={(e) => setDateSort(e.target.value)}>
+          <option value="newest">Newest Applied</option>
+          <option value="oldest">Oldest Applied</option>
+        </select>
       </div>
 
-      {/* Advanced Filters panel */}
-      <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-100/50 flex flex-col md:flex-row gap-4 items-center shrink-0">
-        <div className="w-full md:w-1/2 space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Search</label>
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by company, role..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs font-semibold focus:border-violet-500 focus:bg-white focus:outline-none"
-            />
-            <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="w-full md:w-1/4 space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold focus:border-violet-500 focus:bg-white focus:outline-none"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Applied">Applied</option>
-            <option value="Interview Scheduled">Interview Scheduled</option>
-            <option value="Interview Completed">Interview Completed</option>
-            <option value="Selected">Selected</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Offer Received">Offer Received</option>
-          </select>
-        </div>
-
-        <div className="w-full md:w-1/4 space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Sort Date</label>
-          <select
-            value={dateSort}
-            onChange={(e) => setDateSort(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold focus:border-violet-500 focus:bg-white focus:outline-none"
-          >
-            <option value="newest">Newest Applied</option>
-            <option value="oldest">Oldest Applied</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Horizontal Status tabs selectors */}
       <div className="flex border-b border-slate-250 bg-white px-6 gap-6 shrink-0 overflow-x-auto scrollbar-none shadow-xs select-none">
         {[
           { key: 'all', label: 'All Applications', count: totalApps },
           { key: 'applied', label: 'Applied', count: appliedApps },
-          { key: 'interview_scheduled', label: 'Int Scheduled', count: interviewScheduledApps },
-          { key: 'interview_completed', label: 'Int Completed', count: interviewCompletedApps },
-          { key: 'selected', label: 'Selected', count: selectedApps },
-          { key: 'rejected', label: 'Rejected', count: rejectedApps },
-          { key: 'offer_received', label: 'Offers', count: offerReceivedApps }
         ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => handleTabChange(tab.key)}
             className={`pb-3.5 pt-3.5 text-xs font-black uppercase tracking-wider border-b-2 transition duration-150 flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeTab === tab.key 
-                ? 'border-violet-600 text-violet-600' 
+              activeTab === tab.key
+                ? 'border-violet-600 text-violet-600'
                 : 'border-transparent text-slate-400 hover:text-slate-800'
             }`}
           >
             {tab.label}
             <span className={`inline-flex rounded-full text-[10px] font-black px-2 py-0.5 transition ${
-              activeTab === tab.key 
-                ? 'bg-violet-100 text-violet-700' 
+              activeTab === tab.key
+                ? 'bg-violet-100 text-violet-700'
                 : 'bg-slate-100 text-slate-500'
             }`}>
               {tab.count}
@@ -426,7 +274,6 @@ const Applications = () => {
         ))}
       </div>
 
-      {/* Professional Applications Data Table */}
       <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-100/50 space-y-6">
         {loading ? (
           <div className="min-h-[40vh] flex flex-col items-center justify-center gap-4">
@@ -455,7 +302,6 @@ const Applications = () => {
                   <th className="px-6 py-4">Applied Date</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Application URL</th>
-                  <th className="px-6 py-4">Current Round</th>
                   <th className="px-6 py-4">Last Updated</th>
                   <th className="px-6 py-4 rounded-tr-3xl text-right">Actions</th>
                 </tr>
@@ -498,9 +344,6 @@ const Applications = () => {
                       ) : (
                         <span className="text-slate-400 italic">None</span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-500">
-                      {app.currentRound}
                     </td>
                     <td className="px-6 py-4">
                       {new Date(app.lastUpdated).toLocaleString()}
@@ -545,7 +388,6 @@ const Applications = () => {
         )}
       </div>
 
-      {/* VIEW DETAILS MODAL */}
       {viewModalOpen && selectedApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs select-none">
           <div className="w-full max-w-lg bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-2xl space-y-6 animate-scaleIn">
@@ -559,7 +401,7 @@ const Applications = () => {
                   <p className="text-xs text-slate-500 font-bold">{selectedApp.companyName}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setViewModalOpen(false)}
                 className="rounded-full border border-slate-250 p-2 hover:bg-slate-50 hover:text-slate-900 transition text-slate-400 cursor-pointer"
               >
@@ -576,16 +418,11 @@ const Applications = () => {
               </div>
 
               <div className="rounded-2xl bg-slate-50/50 p-4 border border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Current Round</span>
-                <span className="mt-1.5 block font-extrabold text-slate-800 text-sm">{selectedApp.currentRound}</span>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50/50 p-4 border border-slate-100">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Applied Date</span>
                 <span className="mt-1.5 block font-bold text-slate-700">{new Date(selectedApp.appliedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
               </div>
 
-              <div className="rounded-2xl bg-slate-50/50 p-4 border border-slate-100">
+              <div className="rounded-2xl bg-slate-50/50 p-4 border border-slate-100 col-span-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Application Source</span>
                 <span className="mt-1.5 block font-bold text-slate-700">{selectedApp.applicationSource}</span>
               </div>
@@ -625,7 +462,6 @@ const Applications = () => {
         </div>
       )}
 
-      {/* ADD / EDIT APPLICATION FORM MODAL */}
       {formModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs select-none">
           <div className="w-full max-w-lg bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-2xl space-y-6 animate-scaleIn max-h-[90vh] overflow-y-auto">
@@ -638,7 +474,7 @@ const Applications = () => {
                   Record key metrics to track this application in one workspace.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setFormModalOpen(false)}
                 className="rounded-full border border-slate-250 p-2 hover:bg-slate-50 hover:text-slate-900 transition text-slate-400 cursor-pointer"
               >
@@ -702,37 +538,6 @@ const Applications = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Status</label>
-                  <select
-                    name="status"
-                    value={formFields.status}
-                    onChange={handleFormChange}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold focus:border-violet-500 focus:bg-white focus:outline-none"
-                  >
-                    <option value="Applied">Applied</option>
-                    <option value="Interview Scheduled">Interview Scheduled</option>
-                    <option value="Interview Completed">Interview Completed</option>
-                    <option value="Selected">Selected</option>
-                    <option value="Rejected">Rejected</option>
-                    <option value="Offer Received">Offer Received</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Current Round</label>
-                  <input
-                    type="text"
-                    name="currentRound"
-                    value={formFields.currentRound}
-                    onChange={handleFormChange}
-                    placeholder="e.g. Technical Round 1, HR"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold focus:border-violet-500 focus:bg-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Application URL</label>
                 <input
@@ -767,7 +572,6 @@ const Applications = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

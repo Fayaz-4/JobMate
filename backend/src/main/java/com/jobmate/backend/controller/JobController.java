@@ -117,8 +117,17 @@ public class JobController {
     }
 
     @PostMapping("/fetch")
-    public ResponseEntity<Map<String, Object>> fetchJobs() {
-        int storedCount = jobFetchService.fetchAndStoreAllJobs();
+    public ResponseEntity<Map<String, Object>> fetchJobs(Principal principal) {
+        List<String> skills = new ArrayList<>();
+        if (principal != null) {
+            try {
+                skills = skillExtractionService.getExtractedSkills(principal.getName()).getSkills();
+            } catch (Exception ignored) {
+                skills = new ArrayList<>();
+            }
+        }
+
+        int storedCount = jobFetchService.fetchAndStoreAllJobs(skills);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Job fetching sequence completed successfully",
@@ -128,6 +137,7 @@ public class JobController {
 
     private JobResponse mapToResponse(Job job) {
         if (job == null) return null;
+        String normalizedJobType = jobService.normalizeJobType(job);
         return JobResponse.builder()
                 .id(job.getId())
                 .jobId(job.getJobId())
@@ -139,7 +149,7 @@ public class JobController {
                 .location(job.getLocation())
                 .salary(job.getSalary())
                 .experience(job.getExperience())
-                .jobType(job.getJobType())
+                .jobType(normalizedJobType)
                 .workMode(job.getWorkMode())
                 .jobSource(job.getJobSource())
                 .jobUrl(job.getJobUrl())

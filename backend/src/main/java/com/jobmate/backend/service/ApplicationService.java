@@ -34,7 +34,15 @@ public class ApplicationService {
     private final JobRepository jobRepository;
 
     private static final List<String> VALID_STATUSES = Arrays.asList(
-            "Applied", "Interview Scheduled", "Interview Completed", "Selected", "Rejected", "Offer Received"
+            "Applied",
+            "In Progress",
+            "Assessment",
+            "Interview",
+            "Interview Scheduled",
+            "Interview Completed",
+            "Selected",
+            "Rejected",
+            "Offer Received"
     );
 
     @Transactional

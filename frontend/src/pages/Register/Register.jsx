@@ -250,9 +250,6 @@ const Register = () => {
               Unlock your potential.<br/>
               <span className="text-[#8400cc]">Join Jobmate.</span>
             </h2>
-            <p className="text-sm font-medium text-slate-600 leading-relaxed pr-10 pt-1">
-              Create an account and start discovering automated job matches tailored to your exact skills.
-            </p>
           </div>
 
           {/* 3D Illustration Graphic generated dynamically to match the aesthetic */}

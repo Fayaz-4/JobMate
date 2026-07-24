@@ -22,6 +22,7 @@ import java.util.Collections;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+	
 
     private final JwtAuthenticationFilter jwtAuthFilter;
 

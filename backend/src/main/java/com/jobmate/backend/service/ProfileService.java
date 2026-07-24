@@ -84,6 +84,8 @@ public class ProfileService {
                 .linkedinUrl(request.getLinkedinUrl())
                 .githubUrl(request.getGithubUrl())
                 .portfolioUrl(request.getPortfolioUrl())
+                .profilePhoto(request.getProfilePhoto())
+                .profilePhotoPosition(request.getProfilePhotoPosition())
                 .skills(request.getSkills())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -129,6 +131,8 @@ public class ProfileService {
         profile.setLinkedinUrl(request.getLinkedinUrl());
         profile.setGithubUrl(request.getGithubUrl());
         profile.setPortfolioUrl(request.getPortfolioUrl());
+        profile.setProfilePhoto(request.getProfilePhoto());
+        profile.setProfilePhotoPosition(request.getProfilePhotoPosition());
         profile.setSkills(request.getSkills());
         profile.setUpdatedAt(LocalDateTime.now());
 
@@ -274,6 +278,8 @@ public class ProfileService {
                 .linkedinUrl(profile.getLinkedinUrl())
                 .githubUrl(profile.getGithubUrl())
                 .portfolioUrl(profile.getPortfolioUrl())
+                .profilePhoto(profile.getProfilePhoto())
+                .profilePhotoPosition(profile.getProfilePhotoPosition())
                 .skills(profile.getSkills())
                 .profileCompletion(profile.getProfileCompletion())
                 .createdAt(profile.getCreatedAt())

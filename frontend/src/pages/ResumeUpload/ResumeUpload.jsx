@@ -646,7 +646,7 @@ const ResumeUpload = () => {
                               </span>
                             </div>
                             <button
-                              onClick={() => navigate(`/job-details/${job.id}`)}
+                              onClick={() => navigate(`/jobs/${job.id}`)}
                               className="rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-violet-100 hover:bg-violet-700 transition cursor-pointer"
                             >
                               View Details

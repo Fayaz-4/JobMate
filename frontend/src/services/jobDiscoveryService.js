@@ -6,6 +6,108 @@ const cache = {
   timestamp: 0,
 };
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+const MAX_JOB_AGE_DAYS = 7;
+
+const normalizePostedDate = (value) => {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) {
+    if (value.length >= 3) {
+      const [year, month, day] = value;
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
+  }
+
+  if (typeof value === 'number') {
+    const asMs = value > 1e12 ? value : value * 1000;
+    return new Date(asMs).toISOString();
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^\d+$/.test(trimmed)) {
+      const raw = Number(trimmed);
+      const asMs = raw > 1e12 ? raw : raw * 1000;
+      return new Date(asMs).toISOString();
+    }
+    return trimmed;
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  return String(value);
+};
+
+const isWithinLastSevenDays = (value) => {
+  const normalized = normalizePostedDate(value);
+  if (!normalized) return false;
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(now.getDate() - MAX_JOB_AGE_DAYS);
+  return parsed >= cutoff && parsed <= now;
+};
+
+const isIndiaJob = (job = {}) => {
+  const haystack = [
+    job.title,
+    job.description,
+    job.skills,
+    job.location,
+    job.company,
+    job.candidateRequiredLocation
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (!haystack) return false;
+
+  const explicitIndiaIndicators = [
+    'india',
+    'indian',
+    'in ',
+    ', in',
+    ' in,',
+    'remote in india',
+    'remote - india',
+    'work from india'
+  ];
+
+  const explicitForeignCountries = [
+    'germany',
+    'deutschland',
+    'usa',
+    'u.s.a',
+    'united states',
+    'canada',
+    'uk',
+    'united kingdom',
+    'europe',
+    'worldwide',
+    'global',
+    'australia',
+    'singapore',
+    'dubai',
+    'uae'
+  ];
+
+  if (explicitIndiaIndicators.some(term => haystack.includes(term))) {
+    return true;
+  }
+
+  if (explicitForeignCountries.some(term => haystack.includes(term))) {
+    return false;
+  }
+
+  return true;
+};
 
 /**
  * Normalizes, aggregates, and deduplicates jobs from:
@@ -14,7 +116,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
  * 3. Remotive
  * 4. Arbeitnow
  */
-export const fetchAllJobs = async (searchQuery = '') => {
+export const fetchAllJobs = async (searchQuery = '', roleQuery = '', userSkills = []) => {
   // If cache is valid and no query, return cached data
   if (!searchQuery && cache.data && (Date.now() - cache.timestamp < CACHE_DURATION)) {
     return cache.data;
@@ -25,13 +127,52 @@ export const fetchAllJobs = async (searchQuery = '') => {
   const remotiveUrl = import.meta.env.VITE_REMOTIVE_API_URL || 'https://remotive.com/api/remote-jobs';
   const arbeitnowUrl = import.meta.env.VITE_ARBEITNOW_API_URL || 'https://www.arbeitnow.com/api/job-board-api';
 
-  const queryStr = searchQuery || 'developer';
+  const skillQuery = Array.isArray(userSkills)
+    ? userSkills
+        .filter(skill => typeof skill === 'string' && skill.trim())
+        .slice(0, 3)
+        .join(' ')
+    : '';
+  const queryStr = searchQuery || roleQuery || skillQuery || 'developer';
+  const roleStr = roleQuery || searchQuery || '';
+  const roleTerms = roleStr
+    .toLowerCase()
+    .split(/[\s,/]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const skillTerms = skillQuery
+    .toLowerCase()
+    .split(/[\s,/]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const matchTerms = [...new Set([...roleTerms, ...skillTerms])];
+
+  const roleMatches = (job) => {
+    if (!matchTerms.length) return true;
+    const haystack = `${job.title || ''} ${job.description || ''} ${job.skills || ''}`.toLowerCase();
+    return matchTerms.some(term => haystack.includes(term));
+  };
 
   // 1. Fetch Local Jobs (which stores and returns JSearch crawled jobs)
   const fetchLocal = async () => {
     try {
-      const res = await apiClient.get(searchQuery ? `/jobs/search?query=${encodeURIComponent(searchQuery)}` : '/jobs');
-      return (res.data || []).map(j => ({
+      const endpoint = searchQuery || roleQuery ? `/jobs/search?query=${encodeURIComponent(searchQuery || roleQuery)}` : '/jobs';
+      const res = await apiClient.get(endpoint);
+      return (res.data || [])
+        .filter(j => isWithinLastSevenDays(j.postedDate || j.createdAt))
+        .filter(j => isIndiaJob({
+          title: j.jobTitle || '',
+          description: j.description || '',
+          skills: j.skillsRequired || '',
+          location: j.location || '',
+          company: j.companyName || ''
+        }))
+        .filter(j => roleMatches({
+          title: j.jobTitle || '',
+          description: j.description || '',
+          skills: j.skillsRequired || ''
+        }))
+        .map(j => ({
         id: j.id,
         jobId: String(j.id || j.jobId),
         title: j.jobTitle || '',
@@ -44,7 +185,7 @@ export const fetchAllJobs = async (searchQuery = '') => {
         skills: j.skillsRequired || '',
         applyUrl: j.jobUrl || '',
         source: j.source || j.jobSource || 'JSearch',
-        postedDate: j.postedDate || j.createdAt || '',
+        postedDate: normalizePostedDate(j.postedDate || j.createdAt || ''),
         remote: (j.workMode || '').toLowerCase() === 'remote' || (j.location || '').toLowerCase().includes('remote')
       }));
     } catch (e) {
@@ -60,7 +201,20 @@ export const fetchAllJobs = async (searchQuery = '') => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Adzuna status ${res.status}`);
       const data = await res.json();
-      return (data.results || []).map(j => ({
+      return (data.results || [])
+        .filter(j => isWithinLastSevenDays(j.created || j.created_at || j.job_posted_at_datetime_utc || j.job_posted_at_timestamp))
+        .filter(j => isIndiaJob({
+          title: j.title || '',
+          description: j.description || '',
+          location: j.location?.display_name || '',
+          company: j.company?.display_name || ''
+        }))
+        .filter(j => roleMatches({
+          title: j.title || '',
+          description: j.description || '',
+          skills: ''
+        }))
+        .map(j => ({
         id: `adzuna-${j.id}`,
         jobId: `adzuna-${j.id}`,
         title: j.title || '',
@@ -73,7 +227,7 @@ export const fetchAllJobs = async (searchQuery = '') => {
         skills: '',
         applyUrl: j.redirect_url || '',
         source: 'Adzuna',
-        postedDate: j.created || '',
+        postedDate: normalizePostedDate(j.created || j.created_at || j.job_posted_at_datetime_utc || j.job_posted_at_timestamp || ''),
         remote: j.description.toLowerCase().includes('remote') || j.location?.display_name.toLowerCase().includes('remote')
       }));
     } catch (e) {
@@ -89,7 +243,20 @@ export const fetchAllJobs = async (searchQuery = '') => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Remotive status ${res.status}`);
       const data = await res.json();
-      return (data.jobs || []).map(j => ({
+      return (data.jobs || [])
+        .filter(j => isWithinLastSevenDays(j.publication_date))
+        .filter(j => isIndiaJob({
+          title: j.title || '',
+          description: j.description || '',
+          location: j.candidate_required_location || '',
+          company: j.company_name || ''
+        }))
+        .filter(j => roleMatches({
+          title: j.title || '',
+          description: j.description || '',
+          skills: (j.tags || []).join(', ')
+        }))
+        .map(j => ({
         id: `remotive-${j.id}`,
         jobId: `remotive-${j.id}`,
         title: j.title || '',
@@ -102,7 +269,7 @@ export const fetchAllJobs = async (searchQuery = '') => {
         skills: (j.tags || []).join(', '),
         applyUrl: j.url || '',
         source: 'Remotive',
-        postedDate: j.publication_date || '',
+        postedDate: normalizePostedDate(j.publication_date || ''),
         remote: true
       }));
     } catch (e) {
@@ -119,7 +286,20 @@ export const fetchAllJobs = async (searchQuery = '') => {
       const data = await res.json();
       const rawJobs = data.data || [];
       
-      const mapped = rawJobs.map(j => ({
+      const mapped = rawJobs
+        .filter(j => isWithinLastSevenDays(j.created_at || j.date || j.posted_at))
+        .filter(j => isIndiaJob({
+          title: j.title || '',
+          description: j.description || '',
+          location: j.location || '',
+          company: j.company_name || ''
+        }))
+        .filter(j => roleMatches({
+          title: j.title || '',
+          description: j.description || '',
+          skills: (j.tags || []).join(', ')
+        }))
+        .map(j => ({
         id: `arbeitnow-${j.slug}`,
         jobId: `arbeitnow-${j.slug}`,
         title: j.title || '',
@@ -132,12 +312,12 @@ export const fetchAllJobs = async (searchQuery = '') => {
         skills: (j.tags || []).join(', '),
         applyUrl: j.url || '',
         source: 'Arbeitnow',
-        postedDate: j.created_at || '',
+        postedDate: normalizePostedDate(j.created_at || j.date || j.posted_at || ''),
         remote: j.remote || j.description.toLowerCase().includes('remote')
       }));
 
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+      if (searchQuery || roleQuery) {
+        const q = (searchQuery || roleQuery).toLowerCase();
         return mapped.filter(j => 
           j.title.toLowerCase().includes(q) || 
           j.company.toLowerCase().includes(q) || 

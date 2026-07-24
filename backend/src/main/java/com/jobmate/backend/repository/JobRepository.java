@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
@@ -25,8 +26,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     List<Job> findByCompanyName(String companyName);
     List<Job> findByPostedDate(LocalDate postedDate);
 
-    boolean existsByCompanyNameAndJobTitleAndLocationAndPostedDate(
-            String companyName, String jobTitle, String location, LocalDate postedDate);
+    boolean existsByCompanyNameAndJobTitleAndLocationAndPostedDateAndJobUrl(
+            String companyName, String jobTitle, String location, LocalDate postedDate, String jobUrl);
 
     @Query("SELECT j FROM Job j WHERE " +
            "LOWER(j.jobTitle) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
@@ -47,4 +48,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     );
 
     java.util.Optional<Job> findByJobId(String jobId);
+
+    void deleteByPostedDateBefore(LocalDate cutoffDate);
+
+    List<Job> findByPostedDateBetween(LocalDate startDate, LocalDate endDate);
 }

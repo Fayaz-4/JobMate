@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
 
-    List<Application> findAllByUserEmailIgnoreCaseOrderByLastUpdatedDesc(String email);
+    List<Application> findAllByUser_EmailIgnoreCaseOrderByLastUpdatedDesc(String email);
 
     List<Application> findByUserId(Long userId);
 
@@ -44,3 +44,6 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
             @Param("search") String search
     );
 }
+
+
+

@@ -47,6 +47,8 @@ public class ProfileRequest {
     private String linkedinUrl;
     private String githubUrl;
     private String portfolioUrl;
+    private String profilePhoto;
+    private String profilePhotoPosition;
     
     private String skills;
 }

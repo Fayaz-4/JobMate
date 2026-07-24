@@ -13,10 +13,6 @@ import JobDetails from '../pages/JobDetails/JobDetails.jsx'
 import ApplyRedirect from '../pages/ApplyRedirect/ApplyRedirect.jsx'
 import TodayDigest from '../pages/TodayDigest/TodayDigest.jsx'
 import Applications from '../pages/Applications/Applications.jsx'
-import PlacementReadiness from '../pages/PlacementReadiness/PlacementReadiness.jsx'
-import RealTimeInterviewDashboard from '../pages/RealTimeInterview/RealTimeInterviewDashboard.jsx'
-import RealTimeInterviewRoom from '../pages/RealTimeInterview/RealTimeInterviewRoom.jsx'
-import InterviewAnalytics from '../pages/RealTimeInterview/InterviewAnalytics.jsx'
 
 
 const AppRoutes = () =>
@@ -30,10 +26,6 @@ const AppRoutes = () =>
     { path: '/resume-upload', element: <ResumeUpload /> },
     { path: '/skill-extraction', element: <SkillExtraction /> },
     { path: '/applications', element: <Applications /> },
-    { path: '/placement-readiness', element: <PlacementReadiness /> },
-    { path: '/realtime-interview', element: <RealTimeInterviewDashboard /> },
-    { path: '/realtime-interview/room/:id', element: <RealTimeInterviewRoom /> },
-    { path: '/realtime-interview/analytics', element: <InterviewAnalytics /> },
 
     { path: '/dashboard', element: <Dashboard /> },
     { path: '/jobs', element: <JobList /> },

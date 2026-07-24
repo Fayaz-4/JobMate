@@ -23,16 +23,33 @@ const JobList = () => {
 
   // Filters State
   const [filters, setFilters] = useState({
+    role: '',
     location: '',
     company: '',
     jobType: '',
     workMode: '',
+    experience: '',
     companyType: '',
   });
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 4;
+
+  const formatPostedDate = (value) => {
+    if (!value) return new Date().toISOString().split('T')[0];
+    if (typeof value === 'string') {
+      return value.includes('T') ? value.split('T')[0] : value;
+    }
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString().split('T')[0];
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -66,7 +83,7 @@ const JobList = () => {
       }
 
       // 2. Fetch jobs from all sources (local database/JSearch, Adzuna, Remotive, Arbeitnow) in parallel
-      const data = await fetchAllJobs();
+      const data = await fetchAllJobs('', filters.role, skills);
 
       // 3. Calculate dynamic match score for every job based on actual skills
       const processed = data.map(job => {
@@ -124,6 +141,7 @@ const JobList = () => {
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
     setCurrentPage(1);
+    loadJobsAndSkills();
   };
 
   const handleFilterChange = (name, value) => {
@@ -133,10 +151,12 @@ const JobList = () => {
 
   const resetAllFilters = () => {
     setFilters({
+      role: '',
       location: '',
       company: '',
       jobType: '',
       workMode: '',
+      experience: '',
       companyType: '',
     });
     setCurrentPage(1);
@@ -157,7 +177,7 @@ const JobList = () => {
       jobUrl: job.applyUrl || '',
       source: job.source || 'Unknown',
       jobSource: job.source || 'Unknown',
-      postedDate: job.postedDate ? job.postedDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      postedDate: formatPostedDate(job.postedDate),
       workMode: job.remote ? 'Remote' : 'Onsite',
       companyLogo: job.companyLogo || ''
     };
@@ -240,8 +260,31 @@ const JobList = () => {
     return isStartupJob(job) ? 'Startup' : 'MNC';
   };
 
+  const getJobExperienceLevel = (job) => {
+    if (isFresherFriendly(job)) {
+      return 'Fresher';
+    }
+
+    const experienceText = `${job.experience || ''}`.toLowerCase();
+    const match = experienceText.match(/(\d+)/);
+
+    if (!match) {
+      return 'Not Specified';
+    }
+
+    const years = parseInt(match[1], 10);
+    if (Number.isNaN(years)) {
+      return 'Not Specified';
+    }
+
+    if (years <= 1) return 'Fresher';
+    if (years <= 3) return '1-3 Years';
+    if (years <= 5) return '3-5 Years';
+    return '5+ Years';
+  };
+
   const getUniqueJobTypes = () => {
-    return [...new Set(jobs.map(j => j.employmentType || j.jobType).filter(Boolean))].sort();
+    return ['Full-time', 'Part-time', 'Contract'];
   };
 
   const getUniqueWorkModes = () => {
@@ -252,9 +295,30 @@ const JobList = () => {
     return [...new Set(jobs.map(getJobCompanyType))].sort();
   };
 
+  const getUniqueExperienceLevels = () => {
+    const orderedLevels = ['Fresher', '1-3 Years', '3-5 Years', '5+ Years', 'Not Specified'];
+    const levelsInUse = [...new Set(jobs.map(getJobExperienceLevel))];
+    return orderedLevels.filter(level => levelsInUse.includes(level));
+  };
+
   // Dynamic filter and sorting pipeline
   const getFilteredAndSortedJobs = () => {
     let result = [...jobs];
+    const normalizeJobType = (job) => {
+      const raw = `${job.jobType || job.employmentType || ''} ${job.description || ''}`.toLowerCase().replace(/-/g, ' ');
+      if (raw.includes('part time') || raw.includes('parttime') || raw.includes('intern')) return 'Part-time';
+      if (raw.includes('contract')) return 'Contract';
+      return 'Full-time';
+    };
+
+    // 0. Filter by Role query from the search bar
+    if (filters.role.trim()) {
+      const q = filters.role.toLowerCase().trim();
+      result = result.filter(j => {
+        const roleText = `${j.title || ''} ${j.jobTitle || ''} ${j.description || ''} ${j.skills || ''} ${j.skillsRequired || ''}`.toLowerCase();
+        return roleText.includes(q);
+      });
+    }
 
     // 1. Filter by Location (Substring check, case-insensitive)
     if (filters.location.trim()) {
@@ -270,7 +334,7 @@ const JobList = () => {
 
     // 3. Filter by Job Type (Internship, Full Time, etc.)
     if (filters.jobType) {
-      result = result.filter(j => (j.employmentType || j.jobType) === filters.jobType);
+      result = result.filter(j => normalizeJobType(j) === filters.jobType);
     }
 
     // 4. Filter by Work Mode
@@ -281,6 +345,11 @@ const JobList = () => {
     // 5. Filter by Company Type
     if (filters.companyType) {
       result = result.filter(j => getJobCompanyType(j) === filters.companyType);
+    }
+
+    // 6. Filter by Experience
+    if (filters.experience) {
+      result = result.filter(j => getJobExperienceLevel(j) === filters.experience);
     }
 
     // Default sorting (by postedDate descending, fallback match percentage)
@@ -315,7 +384,19 @@ const JobList = () => {
       {/* Sleek Horizontal Filter Bar */}
       <div className="bg-white border-b border-slate-200 p-6 shadow-sm select-none shrink-0">
         <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            
+            {/* Role Input */}
+            <div className="relative lg:col-span-2">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">💼</span>
+              <input
+                type="text"
+                value={filters.role}
+                onChange={(e) => handleFilterChange('role', e.target.value)}
+                placeholder="Enter role, e.g. React Developer"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8.5 pr-3.5 py-2.5 text-xs font-bold focus:border-violet-500 focus:bg-white focus:outline-none transition text-slate-700 placeholder-slate-400"
+              />
+            </div>
             
             {/* Location Input */}
             <div className="relative">
@@ -365,6 +446,20 @@ const JobList = () => {
                 <option value="">Work Mode ▼</option>
                 {getUniqueWorkModes().map(mode => (
                   <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Experience Selector */}
+            <div className="relative">
+              <select
+                value={filters.experience}
+                onChange={(e) => handleFilterChange('experience', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-700 focus:border-violet-500 focus:bg-white focus:outline-none cursor-pointer"
+              >
+                <option value="">Experience ▼</option>
+                {getUniqueExperienceLevels().map(level => (
+                  <option key={level} value={level}>{level}</option>
                 ))}
               </select>
             </div>

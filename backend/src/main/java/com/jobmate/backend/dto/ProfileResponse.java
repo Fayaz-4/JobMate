@@ -32,6 +32,8 @@ public class ProfileResponse {
     private String linkedinUrl;
     private String githubUrl;
     private String portfolioUrl;
+    private String profilePhoto;
+    private String profilePhotoPosition;
     private String skills;
     private Integer profileCompletion;
     private LocalDateTime createdAt;

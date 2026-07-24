@@ -88,6 +88,12 @@ public class Profile {
     @Column(columnDefinition = "TEXT")
     private String skills;
 
+    @Column(name = "profile_photo", columnDefinition = "TEXT")
+    private String profilePhoto;
+
+    @Column(name = "profile_photo_position", length = 20)
+    private String profilePhotoPosition;
+
     @Column(name = "profile_completion")
     private Integer profileCompletion;
 

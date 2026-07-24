@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import Cropper from 'react-easy-crop'
 import { getProfile, createProfile, updateProfile } from '../../services/profileService'
 
 const Profile = () => {
@@ -31,6 +32,8 @@ const Profile = () => {
     linkedinUrl: '',
     githubUrl: '',
     portfolioUrl: '',
+    profilePhoto: '',
+    profilePhotoPosition: 'center',
     skills: '', // Comma separated in DB
   })
 
@@ -38,6 +41,13 @@ const Profile = () => {
   const [fieldErrors, setFieldErrors] = useState({})
   const [skillsList, setSkillsList] = useState([])
   const [skillInput, setSkillInput] = useState('')
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [photoPosition, setPhotoPosition] = useState('center')
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [rawImageForCrop, setRawImageForCrop] = useState('')
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
 
   useEffect(() => {
     // 1. Recover user email/fullname from localStorage (if logged in, auth saves userDto)
@@ -96,8 +106,12 @@ const Profile = () => {
           linkedinUrl: data.linkedinUrl || '',
           githubUrl: data.githubUrl || '',
           portfolioUrl: data.portfolioUrl || '',
+          profilePhoto: data.profilePhoto || '',
+          profilePhotoPosition: data.profilePhotoPosition || 'center',
           skills: data.skills || '',
         })
+        setPhotoPreview(data.profilePhoto || '')
+        setPhotoPosition(data.profilePhotoPosition || 'center')
 
         if (data.skills) {
           setSkillsList(data.skills.split(',').map(s => s.trim()).filter(s => s.length > 0))
@@ -144,6 +158,87 @@ const Profile = () => {
     const updated = skillsList.filter(s => s !== skillToRemove)
     setSkillsList(updated)
     setFormData(prev => ({ ...prev, skills: updated.join(',') }))
+  }
+
+  const getCroppedImage = (imageSrc, pixelCrop) => {
+    return new Promise((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = pixelCrop.width
+        canvas.height = pixelCrop.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Canvas context is unavailable'))
+          return
+        }
+
+        ctx.drawImage(
+          image,
+          pixelCrop.x,
+          pixelCrop.y,
+          pixelCrop.width,
+          pixelCrop.height,
+          0,
+          0,
+          pixelCrop.width,
+          pixelCrop.height
+        )
+        resolve(canvas.toDataURL('image/png'))
+      }
+      image.onerror = reject
+      image.src = imageSrc
+    })
+  }
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      setRawImageForCrop(result)
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      setCroppedAreaPixels(null)
+      setCropModalOpen(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemovePhoto = () => {
+    setPhotoPreview('')
+    setFormData((prev) => ({
+      ...prev,
+      profilePhoto: '',
+    }))
+  }
+
+  const handleCropSave = async () => {
+    if (!rawImageForCrop || !croppedAreaPixels) return
+
+    try {
+      const croppedImage = await getCroppedImage(rawImageForCrop, croppedAreaPixels)
+      setPhotoPreview(croppedImage)
+      setFormData((prev) => ({
+        ...prev,
+        profilePhoto: croppedImage,
+      }))
+      setCropModalOpen(false)
+      setRawImageForCrop('')
+    } catch (err) {
+      setError('Failed to crop the selected photo.')
+    }
+  }
+
+  const handlePhotoPositionChange = (e) => {
+    const value = e.target.value
+    setPhotoPosition(value)
+    setFormData((prev) => ({
+      ...prev,
+      profilePhotoPosition: value,
+    }))
   }
 
   // Frontend Validations
@@ -221,6 +316,18 @@ const Profile = () => {
       }
       
       setIsEditing(false)
+      try {
+        const storedUser = localStorage.getItem('user')
+        const parsedUser = storedUser ? JSON.parse(storedUser) : {}
+        const mergedUser = {
+          ...parsedUser,
+          profilePhoto: formData.profilePhoto,
+        }
+        localStorage.setItem('user', JSON.stringify(mergedUser))
+        window.dispatchEvent(new Event('profileUpdated'))
+      } catch (storageError) {
+        console.warn('Could not update localStorage profile photo')
+      }
       // Scroll to top to see success banner
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -242,7 +349,7 @@ const Profile = () => {
       formData.phone, formData.dateOfBirth, formData.gender, formData.location,
       formData.degree, formData.specialization, formData.collegeName, formData.graduationYear,
       formData.cgpa, formData.preferredRole, formData.preferredLocation, formData.experienceLevel,
-      formData.linkedinUrl, formData.githubUrl, formData.portfolioUrl, formData.skills
+      formData.linkedinUrl, formData.githubUrl, formData.portfolioUrl, formData.profilePhoto, formData.skills
     ]
     const filled = fields.filter(f => f && f.toString().trim().length > 0).length
     return Math.round((filled / fields.length) * 100)
@@ -272,15 +379,101 @@ const Profile = () => {
             </div>
           )}
 
-          {/* Section 1: Profile Header Card */}
-          <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
-            <div className="flex items-center gap-6">
-              <div className="flex h-24 w-24 items-center justify-center rounded-[2rem] bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-100 shrink-0">
-                <span className="text-4xl font-extrabold">{userMeta.fullName.substring(0, 2).toUpperCase()}</span>
+          {cropModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-8 backdrop-blur-sm">
+              <div className="w-full max-w-3xl rounded-[2.5rem] bg-white p-6 shadow-xl">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-2xl font-bold text-slate-950">Crop Profile Photo</h3>
+                  <p className="text-sm text-slate-500">Adjust the image before saving it to your profile.</p>
+                </div>
+
+                <div className="mt-5">
+                  <div className="relative h-80 w-full overflow-hidden rounded-[2rem] bg-slate-100">
+                    <Cropper
+                      image={rawImageForCrop}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      cropShape="round"
+                      showGrid={false}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+                    />
+                  </div>
+
+                  <div className="mt-5 space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Zoom</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      value={zoom}
+                      onChange={(e) => setZoom(Number(e.target.value))}
+                      className="w-full accent-violet-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropModalOpen(false)
+                      setRawImageForCrop('')
+                    }}
+                    className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCropSave}
+                    className="rounded-full bg-violet-600 px-6 py-3 text-sm font-bold text-white shadow-md shadow-violet-100 transition hover:bg-violet-700"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <h2 className="text-3xl font-black text-slate-950">{userMeta.fullName}</h2>
-                <p className="text-sm font-semibold text-slate-500">{userMeta.email}</p>
+            </div>
+          )}
+
+            {/* Section 1: Profile Header Card */}
+            <div className="rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
+              <div className="flex items-center gap-6">
+                <div className="relative h-24 w-24 shrink-0">
+                  <div className="h-24 w-24 overflow-hidden rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-100">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                        style={{ objectPosition: photoPosition }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <span className="text-4xl font-extrabold">{userMeta.fullName.substring(0, 2).toUpperCase()}</span>
+                      </div>
+                    )}
+                  </div>
+                  {isEditing && (
+                    <label className="absolute inset-0 flex cursor-pointer items-end justify-end rounded-full bg-slate-950/0 transition hover:bg-slate-950/10">
+                      <span className="m-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-700 shadow-sm">
+                        Change
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-3xl font-black text-slate-950">{userMeta.fullName}</h2>
+                  <p className="text-sm font-semibold text-slate-500">{userMeta.email}</p>
                 <div className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 uppercase">
                   {formData.preferredRole || 'Candidate Profile'}
                 </div>

@@ -81,7 +81,7 @@ public class DashboardService {
         int skillsExtractedCount = userSkills.size();
 
         // Count recommended jobs based on skills
-        List<Job> allJobs = jobRepository.findAll();
+        List<Job> allJobs = jobRepository.findAllByPostedDateBetween(LocalDate.now().minusDays(3), LocalDate.now());
         List<ScoredJob> scoredJobs = new ArrayList<>();
 
         for (Job job : allJobs) {
@@ -199,7 +199,7 @@ public class DashboardService {
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
 
-        List<Job> allJobs = jobRepository.findAll();
+        List<Job> allJobs = jobRepository.findAllByPostedDateBetween(LocalDate.now().minusDays(3), LocalDate.now());
         long recommendedCount = 0;
         for (Job job : allJobs) {
             String jobSkillsStr = job.getSkillsRequired();
@@ -246,7 +246,7 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public List<ApplicationResponse> getRecentApplications(User user) {
-        List<Application> list = applicationRepository.findAllByUserEmailIgnoreCaseOrderByLastUpdatedDesc(user.getEmail());
+        List<Application> list = applicationRepository.findAllByUser_EmailIgnoreCaseOrderByLastUpdatedDesc(user.getEmail());
         return list.stream()
                 .limit(5)
                 .map(this::mapToApplicationResponse)
@@ -289,7 +289,7 @@ public class DashboardService {
                 .map(String::toLowerCase)
                 .collect(Collectors.toList());
 
-        List<Job> allJobs = jobRepository.findAll();
+        List<Job> allJobs = jobRepository.findAllByPostedDateBetween(LocalDate.now().minusDays(3), LocalDate.now());
         List<ScoredJob> scoredJobs = new ArrayList<>();
 
         for (Job job : allJobs) {
@@ -364,6 +364,7 @@ public class DashboardService {
 
     private JobResponse mapToJobResponse(Job job) {
         if (job == null) return null;
+        String normalizedJobType = normalizeJobType(job);
         return JobResponse.builder()
                 .id(job.getId())
                 .jobTitle(job.getJobTitle())
@@ -371,7 +372,7 @@ public class DashboardService {
                 .location(job.getLocation())
                 .salary(job.getSalary())
                 .experience(job.getExperience())
-                .jobType(job.getJobType())
+                .jobType(normalizedJobType)
                 .workMode(job.getWorkMode())
                 .jobSource(job.getJobSource())
                 .jobUrl(job.getJobUrl())
@@ -385,6 +386,38 @@ public class DashboardService {
                 .createdAt(job.getCreatedAt())
                 .updatedAt(job.getUpdatedAt())
                 .build();
+    }
+
+    private String normalizeJobType(Job job) {
+        if (job == null) {
+            return "Full-time";
+        }
+
+        String raw = firstNonBlank(job.getJobType(), job.getEmploymentType(), job.getDescription());
+        if (raw == null) {
+            return "Full-time";
+        }
+
+        String value = raw.toLowerCase().replace("-", " ").trim();
+        if (value.contains("part time") || value.contains("parttime") || value.contains("intern")) {
+            return "Part-time";
+        }
+        if (value.contains("contract")) {
+            return "Contract";
+        }
+        return "Full-time";
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private ApplicationResponse mapToApplicationResponse(Application app) {

@@ -181,7 +181,7 @@ public class JSearchService {
                             jobToSave = existingOpt.get();
                             jobToSave.setJobTitle((String) jobMap.get("job_title"));
                             jobToSave.setCompanyName((String) jobMap.get("employer_name"));
-                            jobToSave.setLocation((String) jobMap.get("job_city") + ", " + (String) jobMap.get("job_country"));
+                            jobToSave.setLocation(buildLocation((String) jobMap.get("job_city"), (String) jobMap.get("job_country")));
                             jobToSave.setSalary(salaryStr);
                             jobToSave.setEmploymentType(jobType);
                             jobToSave.setJobType(jobType); // keep legacy aligned
@@ -197,9 +197,9 @@ public class JSearchService {
                                     .jobId(jobId)
                                     .jobTitle((String) jobMap.get("job_title"))
                                     .companyName((String) jobMap.get("employer_name"))
-                                    .location((String) jobMap.get("job_city") + ", " + (String) jobMap.get("job_country"))
+                                    .location(buildLocation((String) jobMap.get("job_city"), (String) jobMap.get("job_country")))
                                     .salary(salaryStr)
-                                    .experience("0 - 3 years")
+                                    .experience(inferExperience((String) jobMap.get("job_title"), (String) jobMap.get("job_description")))
                                     .employmentType(jobType)
                                     .jobType(jobType) // keep legacy aligned
                                     .workMode(workMode)
@@ -224,6 +224,29 @@ public class JSearchService {
         }
 
         return fetched;
+    }
+
+    private String buildLocation(String city, String country) {
+        boolean hasCity = city != null && !city.trim().isEmpty() && !"null".equalsIgnoreCase(city.trim());
+        boolean hasCountry = country != null && !country.trim().isEmpty() && !"null".equalsIgnoreCase(country.trim());
+        if (hasCity && hasCountry) return city.trim() + ", " + country.trim();
+        if (hasCity) return city.trim();
+        if (hasCountry) return country.trim();
+        return "Location Not Specified";
+    }
+
+    private String inferExperience(String title, String description) {
+        String text = ((title != null ? title : "") + " " + (description != null ? description : "")).toLowerCase();
+        if (text.contains("senior") || text.contains("sr.") || text.contains("lead ") || text.contains("principal")) {
+            return "5+ years";
+        }
+        if (text.contains("mid-level") || text.contains("mid level") || text.contains("3-5 years") || text.contains("3+ years")) {
+            return "3 - 5 years";
+        }
+        if (text.contains("fresher") || text.contains("entry level") || text.contains("entry-level") || text.contains("trainee") || text.contains("intern")) {
+            return "0 - 1 years";
+        }
+        return "0 - 3 years";
     }
 
     @Transactional
@@ -290,3 +313,4 @@ public class JSearchService {
         return matchedSkills;
     }
 }
+
