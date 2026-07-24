@@ -252,7 +252,7 @@ The backend is prepared for integrations with:
 ### Backend Setup
 
 1. Open the `backend` folder.
-2. Configure `src/main/resources/application.properties`.
+2. Configure `src/main/resources/application.properties` or supply environment variables such as `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `PORT`.
 3. Set the MySQL username, password, and any required API keys.
 4. Run the backend with Maven.
 
@@ -260,6 +260,12 @@ Example:
 
 ```bash
 mvn spring-boot:run
+```
+
+For hosted deployments, the app can also be started with:
+
+```bash
+java -jar target/jobmate-backend-0.1.0.jar
 ```
 
 ### Frontend Setup

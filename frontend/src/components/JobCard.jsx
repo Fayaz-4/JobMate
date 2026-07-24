@@ -1,4 +1,3 @@
-import React from 'react';
 import { isStartupJob, isFresherFriendly } from '../services/jobDiscoveryService';
 
 const JobCard = ({

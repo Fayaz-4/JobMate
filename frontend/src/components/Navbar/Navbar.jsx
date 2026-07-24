@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { getProfile } from '../../services/profileService'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const navigate = useNavigate()
   const [profilePhoto, setProfilePhoto] = useState('')
   const [userMeta, setUserMeta] = useState({
     fullName: 'SHAIK FAYAZ BASHA',
@@ -26,7 +25,7 @@ const Navbar = () => {
             fullName: parsed.fullName || 'SHAIK FAYAZ BASHA',
             email: parsed.email || '',
           })
-        } catch (e) {
+        } catch {
           console.warn('Could not parse user metadata')
         }
       }
@@ -37,7 +36,7 @@ const Navbar = () => {
         try {
           const parsed = JSON.parse(storedUser)
           setProfilePhoto(parsed.profilePhoto || '')
-        } catch (e) {
+        } catch {
           console.warn('Could not parse user metadata')
         }
       }
@@ -52,7 +51,7 @@ const Navbar = () => {
         if (profile?.profilePhoto) {
           setProfilePhoto(profile.profilePhoto)
         }
-      } catch (e) {
+      } catch {
         // Silently ignore navbar avatar refresh failures.
       }
     }
@@ -77,7 +76,7 @@ const Navbar = () => {
         try {
           const parsed = JSON.parse(storedUser)
           setProfilePhoto(parsed.profilePhoto || '')
-        } catch (e) {
+        } catch {
           console.warn('Could not parse user metadata')
         }
       }
@@ -89,16 +88,14 @@ const Navbar = () => {
         if (profile?.profilePhoto) {
           setProfilePhoto(profile.profilePhoto)
         }
-      } catch (e) {
+      } catch {
         // Silently ignore navbar avatar refresh failures.
       }
     }
 
     if (isAuthenticated) {
       syncProfilePhotoFromStorage()
-      loadProfilePhoto()
-    } else {
-      setProfilePhoto('')
+      void loadProfilePhoto()
     }
   }, [isAuthenticated])
 
@@ -109,12 +106,6 @@ const Navbar = () => {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
-
-  const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    setIsAuthenticated(false)
-    navigate('/')
-  }
 
   return (
     <header 

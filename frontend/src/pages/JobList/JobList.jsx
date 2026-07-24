@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchAllJobs, isFresherFriendly, isStartupJob } from '../../services/jobDiscoveryService';
 import { getExtractedSkills } from '../../services/skillExtractionService';
@@ -15,11 +15,6 @@ const JobList = () => {
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [error, setError] = useState('');
   const [userSkills, setUserSkills] = useState([]);
-  
-  const [userMeta, setUserMeta] = useState({
-    fullName: 'Samantha Taylor',
-    email: 'samantha.taylor@example.com',
-  });
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -51,63 +46,7 @@ const JobList = () => {
     return new Date().toISOString().split('T')[0];
   };
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setUserMeta({
-          fullName: parsed.fullName || 'User Profile',
-          email: parsed.email || 'user@example.com',
-        });
-      } catch (e) {
-        console.warn('Could not parse user metadata from localStorage');
-      }
-    }
-
-    loadJobsAndSkills();
-  }, []);
-
-  const loadJobsAndSkills = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      // 1. Fetch user resume skills for dynamic matching
-      let skills = [];
-      try {
-        const skillsData = await getExtractedSkills();
-        skills = skillsData.skills || [];
-        setUserSkills(skills);
-      } catch (sErr) {
-        console.warn('Could not fetch extracted profile skills for ATS matching');
-      }
-
-      // 2. Fetch jobs from all sources (local database/JSearch, Adzuna, Remotive, Arbeitnow) in parallel
-      const data = await fetchAllJobs('', filters.role, skills);
-
-      // 3. Calculate dynamic match score for every job based on actual skills
-      const processed = data.map(job => {
-        const score = calculateMatchScore(skills, job.description, job.skills);
-        return {
-          ...job,
-          matchPercentage: score
-        };
-      });
-
-      setJobs(processed);
-    } catch (err) {
-      setError('Failed to fetch job opportunities from discovery engines.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadJobs = async () => {
-    await loadJobsAndSkills();
-  };
-
-  // Helper for dynamic skill matching
-  const calculateMatchScore = (userSkillsList, jobDesc, jobSkills) => {
+  function calculateMatchScore(userSkillsList, jobDesc, jobSkills) {
     if (!userSkillsList || userSkillsList.length === 0) return 0;
     
     const descText = (jobDesc || '').toLowerCase();
@@ -136,7 +75,48 @@ const JobList = () => {
     } else {
       return Math.min(100, Math.round((matched.length / 5) * 100));
     }
+  }
+
+  const loadJobsAndSkills = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // 1. Fetch user resume skills for dynamic matching
+      let skills = [];
+      try {
+        const skillsData = await getExtractedSkills();
+        skills = skillsData.skills || [];
+        setUserSkills(skills);
+      } catch {
+        console.warn('Could not fetch extracted profile skills for ATS matching');
+      }
+
+      // 2. Fetch jobs from all sources (local database/JSearch, Adzuna, Remotive, Arbeitnow) in parallel
+      const data = await fetchAllJobs('', filters.role, skills);
+
+      // 3. Calculate dynamic match score for every job based on actual skills
+      const processed = data.map(job => {
+        const score = calculateMatchScore(skills, job.description, job.skills);
+        return {
+          ...job,
+          matchPercentage: score
+        };
+      });
+
+      setJobs(processed);
+    } catch {
+      setError('Failed to fetch job opportunities from discovery engines.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Helper for dynamic skill matching
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadJobsAndSkills();
+    });
+  }, []);
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -165,25 +145,33 @@ const JobList = () => {
   const handleViewDetails = (job) => {
     const mappedJob = {
       jobId: String(job.jobId),
-      jobTitle: job.title || '',
-      companyName: job.company || '',
+      title: job.title || '',
+      company: job.company || '',
       location: job.location || 'India',
       description: job.description || '',
       employmentType: job.employmentType || 'Full Time',
       jobType: job.employmentType || 'Full Time',
       salary: job.salary || 'Not Disclosed',
       experience: job.experience || '0 - 3 years',
-      skillsRequired: job.skills || '',
+      skills: job.skills || '',
       jobUrl: job.applyUrl || '',
       source: job.source || 'Unknown',
-      jobSource: job.source || 'Unknown',
       postedDate: formatPostedDate(job.postedDate),
+      remote: Boolean(job.remote),
+      companyLogo: job.companyLogo || '',
+      matchPercentage: job.matchPercentage,
+      jobTitle: job.title || '',
+      companyName: job.company || '',
+      skillsRequired: job.skills || '',
+      jobSource: job.source || 'Unknown',
       workMode: job.remote ? 'Remote' : 'Onsite',
-      companyLogo: job.companyLogo || ''
     };
 
+    setSelectedJobDetails(mappedJob);
+    setViewDetailsOpen(true);
+
     saveJob(mappedJob).catch(err => {
-      console.warn("Background external job save failed:", err);
+      console.warn('Background external job save failed:', err);
     });
 
     navigate(`/jobs/${job.jobId}`, { state: { job } });
@@ -204,13 +192,6 @@ const JobList = () => {
     if (job.applyUrl) {
       window.open(job.applyUrl, '_blank');
     }
-  };
-
-  const parseSalaryAmount = (salaryStr) => {
-    if (!salaryStr) return 0;
-    const clean = salaryStr.replace(/[^0-9]/g, '');
-    const num = parseInt(clean, 10);
-    return isNaN(num) ? 0 : num;
   };
 
   const getMatchingSkills = (job) => {

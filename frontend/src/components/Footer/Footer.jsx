@@ -1,4 +1,3 @@
-import React from 'react'
 
 const Footer = () => (
   <footer className="border-t border-slate-200 bg-slate-900 text-slate-400">

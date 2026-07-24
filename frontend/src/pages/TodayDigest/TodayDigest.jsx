@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTodayJobs } from '../../services/jobService';
 
@@ -6,7 +6,6 @@ const TodayDigest = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
-  const [filteredJobs, setFilteredJobs] = useState([]);
   const [error, setError] = useState('');
   
   // Filter Fields
@@ -14,44 +13,26 @@ const TodayDigest = () => {
   const [roleFilter, setRoleFilter] = useState('');
   const [workModeFilter, setWorkModeFilter] = useState('All');
 
-  const [userMeta, setUserMeta] = useState({
-    fullName: 'Samantha Taylor',
-    email: 'samantha.taylor@example.com',
-  });
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setUserMeta({
-          fullName: parsed.fullName || 'User Profile',
-          email: parsed.email || 'user@example.com',
-        });
-      } catch (e) {
-        console.warn('Could not parse user metadata from localStorage');
-      }
-    }
-
-    loadTodayJobs();
-  }, []);
-
-  const loadTodayJobs = async () => {
+  async function loadTodayJobs() {
     setLoading(true);
     setError('');
     try {
       const data = await getTodayJobs();
       setJobs(data);
-      setFilteredJobs(data);
-    } catch (err) {
+    } catch {
       setError('Failed to fetch today\'s digest data.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // Perform Client-side Dynamic Filtering on Today's Jobs List
   useEffect(() => {
+    queueMicrotask(() => {
+      void loadTodayJobs();
+    });
+  }, []);
+
+  const filteredJobs = useMemo(() => {
     let result = jobs;
 
     if (locationFilter.trim()) {
@@ -66,8 +47,8 @@ const TodayDigest = () => {
       result = result.filter(j => j.workMode && j.workMode.toLowerCase() === workModeFilter.toLowerCase());
     }
 
-    setFilteredJobs(result);
-  }, [locationFilter, roleFilter, workModeFilter, jobs]);
+    return result;
+  }, [jobs, locationFilter, roleFilter, workModeFilter]);
 
   // Helper to determine if a job was posted today or yesterday
   const getPostedBadge = (postedDateStr) => {
@@ -94,8 +75,8 @@ const TodayDigest = () => {
       } else if (checkDateStr === yesterdayStr) {
         return "Posted Yesterday";
       }
-    } catch (e) {
-      console.warn('Error parsing postedDate:', e);
+    } catch (error) {
+      console.warn('Error parsing postedDate:', error);
     }
     return "Recently Posted";
   };

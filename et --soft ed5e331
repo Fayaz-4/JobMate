@@ -1,0 +1,6 @@
+[33m93bbc47[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m update frontend and backend
+[33m2f46d8f[m Remove exposed API keys from config
+[33mc8b498c[m Update backend and frontend features
+[33med5e331[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m docs: align README with JobMate features
+[33m0431e59[m Add JobMate application
+[33m39a205e[m Initial commit

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import Cropper from 'react-easy-crop'
 import { getProfile, createProfile, updateProfile } from '../../services/profileService'
 
@@ -10,9 +10,31 @@ const Profile = () => {
   const [successMsg, setSuccessMsg] = useState('')
 
   // User details fetched from Auth (stored in JWT / decoded or stored on signup)
-  const [userMeta, setUserMeta] = useState({
-    fullName: 'Samantha Taylor',
-    email: 'samantha.taylor@example.com'
+  const [userMeta, setUserMeta] = useState(() => {
+    if (typeof window === 'undefined') {
+      return {
+        fullName: 'Samantha Taylor',
+        email: 'samantha.taylor@example.com'
+      }
+    }
+
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser)
+        return {
+          fullName: parsed.fullName || 'User Profile',
+          email: parsed.email || 'user@example.com'
+        }
+      } catch {
+        console.warn('Could not parse user metadata from localStorage')
+      }
+    }
+
+    return {
+      fullName: 'Samantha Taylor',
+      email: 'samantha.taylor@example.com'
+    }
   })
 
   // Profile fields state
@@ -48,25 +70,6 @@ const Profile = () => {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
-
-  useEffect(() => {
-    // 1. Recover user email/fullname from localStorage (if logged in, auth saves userDto)
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser)
-        setUserMeta({
-          fullName: parsed.fullName || 'User Profile',
-          email: parsed.email || 'user@example.com'
-        })
-      } catch (e) {
-        console.warn('Could not parse user metadata from localStorage')
-      }
-    }
-
-    // 2. Fetch profile from backend
-    loadProfile()
-  }, [])
 
   const loadProfile = async () => {
     setLoading(true)
@@ -125,6 +128,12 @@ const Profile = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadProfile()
+    })
+  }, [])
 
   // Handle standard input change
   const handleChange = (e) => {
@@ -207,14 +216,6 @@ const Profile = () => {
     reader.readAsDataURL(file)
   }
 
-  const handleRemovePhoto = () => {
-    setPhotoPreview('')
-    setFormData((prev) => ({
-      ...prev,
-      profilePhoto: '',
-    }))
-  }
-
   const handleCropSave = async () => {
     if (!rawImageForCrop || !croppedAreaPixels) return
 
@@ -227,18 +228,9 @@ const Profile = () => {
       }))
       setCropModalOpen(false)
       setRawImageForCrop('')
-    } catch (err) {
+    } catch {
       setError('Failed to crop the selected photo.')
     }
-  }
-
-  const handlePhotoPositionChange = (e) => {
-    const value = e.target.value
-    setPhotoPosition(value)
-    setFormData((prev) => ({
-      ...prev,
-      profilePhotoPosition: value,
-    }))
   }
 
   // Frontend Validations
@@ -276,7 +268,6 @@ const Profile = () => {
     }
 
     // URL validations
-    const urlRegex = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/
     const urlFields = ['linkedinUrl', 'githubUrl', 'portfolioUrl']
     urlFields.forEach(field => {
       const val = formData[field]
@@ -305,12 +296,11 @@ const Profile = () => {
 
     setLoading(true)
     try {
-      let savedProfile
       if (profileExists) {
-        savedProfile = await updateProfile(formData)
+        await updateProfile(formData)
         setSuccessMsg('Profile updated successfully!')
       } else {
-        savedProfile = await createProfile(formData)
+        await createProfile(formData)
         setSuccessMsg('Profile created successfully!')
         setProfileExists(true)
       }
@@ -325,7 +315,7 @@ const Profile = () => {
         }
         localStorage.setItem('user', JSON.stringify(mergedUser))
         window.dispatchEvent(new Event('profileUpdated'))
-      } catch (storageError) {
+      } catch {
         console.warn('Could not update localStorage profile photo')
       }
       // Scroll to top to see success banner
@@ -335,12 +325,6 @@ const Profile = () => {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
   }
 
   // Calculate dynamic Profile Completion %

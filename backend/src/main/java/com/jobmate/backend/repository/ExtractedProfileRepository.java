@@ -12,3 +12,5 @@ public interface ExtractedProfileRepository extends JpaRepository<ExtractedProfi
     Optional<ExtractedProfile> findByUserEmailIgnoreCase(String email);
     Optional<ExtractedProfile> findByResumeId(Long resumeId);
 }
+
+

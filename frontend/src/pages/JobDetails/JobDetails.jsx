@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getJobDetails, getSimilarJobs } from '../../services/jobDetailsService';
 import { createApplication } from '../../services/applicationService';
@@ -45,46 +45,60 @@ const JobDetails = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState(false);
-  const [userMeta, setUserMeta] = useState({
-    fullName: 'Samantha Taylor',
-    email: 'samantha.taylor@example.com',
-  });
 
   useEffect(() => {
-    // Recover user meta
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        const parsed = JSON.parse(storedUser);
-        setUserMeta({
-          fullName: parsed.fullName || 'User Profile',
-          email: parsed.email || 'user@example.com',
-        });
-      } catch (e) {
+        JSON.parse(storedUser);
+      } catch {
         console.warn('Could not parse user metadata');
       }
 
-      // Check if resume exists
-      getResume()
+      void getResume()
         .then(() => setHasResume(true))
         .catch(() => setHasResume(false));
     }
   }, []);
 
+  const loadJobDetailsData = async (jobId) => {
+    setLoading(true);
+    setError('');
+    setIsApplied(false);
+    try {
+      const [details, similar] = await Promise.all([
+        getJobDetails(jobId),
+        getSimilarJobs(jobId)
+      ]);
+      setJob(details);
+      setSimilarJobs(similar);
+      setIsSaved((parseInt(jobId) % 3) === 0);
+    } catch {
+      setError('Failed to fetch job details. Please check server connections.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (id) {
-      if (location.state?.job) {
-        const mapped = mapFrontendJobToDetails(location.state.job);
+    if (!id) return;
+
+    if (location.state?.job) {
+      const mapped = mapFrontendJobToDetails(location.state.job);
+      queueMicrotask(() => {
         setJob(mapped);
         setLoading(false);
-        getSimilarJobs(id)
-          .then(similar => setSimilarJobs(similar))
+        void getSimilarJobs(id)
+          .then((similar) => setSimilarJobs(similar))
           .catch(() => {});
-      } else {
-        loadJobDetailsData(id);
-      }
+      });
+      return;
     }
-  }, [id, location.state]);
+
+    queueMicrotask(() => {
+      void loadJobDetailsData(id);
+    });
+  }, [id, location.state, mapFrontendJobToDetails]);
 
   useEffect(() => {
     if (job) {
@@ -98,27 +112,6 @@ const JobDetails = () => {
       console.log("=====================================");
     }
   }, [job, hasResume]);
-
-  const loadJobDetailsData = async (jobId) => {
-    setLoading(true);
-    setError('');
-    setIsApplied(false);
-    try {
-      const [details, similar] = await Promise.all([
-        getJobDetails(jobId),
-        getSimilarJobs(jobId)
-      ]);
-      setJob(details);
-      setSimilarJobs(similar);
-      
-      // Seed random saved state based on ID for high-fidelity state management
-      setIsSaved((parseInt(jobId) % 3) === 0);
-    } catch (err) {
-      setError('Failed to fetch job details. Please check server connections.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const toggleSave = () => {
     setIsSaved(!isSaved);

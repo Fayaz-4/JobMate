@@ -1,4 +1,3 @@
-import React from 'react'
 
 const CompanyCard = ({ name, jobsCount = 'Active Roles', rating = '4.2' }) => {
   return (

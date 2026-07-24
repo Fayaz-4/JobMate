@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
 import { getResume, uploadResume, replaceResume, deleteResume } from '../../services/resumeService';
@@ -83,54 +83,11 @@ const ResumeUpload = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
 
-  const [userMeta, setUserMeta] = useState({
-    fullName: 'Samantha Taylor',
-    email: 'samantha.taylor@example.com',
-  });
-
   useEffect(() => {
-    const fetchUserAndLoadData = async () => {
-      // Try to load from localStorage first
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          setUserMeta({
-            fullName: parsed.fullName || 'User Profile',
-            email: parsed.email || 'user@example.com',
-          });
-        } catch (e) {
-          console.warn('Could not parse user metadata from localStorage');
-        }
-      }
-
-      // Fetch fresh details from backend to ensure alignment
-      try {
-        const response = await apiClient.get('/auth/me');
-        if (response.data) {
-          const userObj = {
-            fullName: response.data.fullName,
-            email: response.data.email,
-            userId: response.data.id,
-            role: response.data.role
-          };
-          localStorage.setItem('user', JSON.stringify(userObj));
-          setUserMeta({
-            fullName: userObj.fullName,
-            email: userObj.email
-          });
-        }
-      } catch (err) {
-        console.warn('Failed to fetch user metadata from /auth/me', err);
-      }
-
-      await loadResumeData();
-    };
-
-    fetchUserAndLoadData();
+    void loadResumeData();
   }, []);
 
-  const loadResumeData = async () => {
+  async function loadResumeData() {
     setLoading(true);
     setError('');
     try {
@@ -154,7 +111,7 @@ const ResumeUpload = () => {
           } else {
             setMatchedJobs([]);
           }
-        } catch (err) {
+        } catch {
           setExtractedProfile(null);
           setMatchedJobs([]);
         }
@@ -326,8 +283,8 @@ const ResumeUpload = () => {
       setResumeInfo(null);
       setExtractedProfile(null);
       setSuccess('Resume deleted successfully.');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete resume.');
+    } catch {
+      setError('Failed to delete resume.');
     } finally {
       setLoading(false);
     }
@@ -344,7 +301,7 @@ const ResumeUpload = () => {
       const file = new Blob([response.data], { type: resumeInfo.fileType });
       const fileURL = URL.createObjectURL(file);
       window.open(fileURL, '_blank');
-    } catch (err) {
+    } catch {
       setError('Could not download or open file from storage.');
     }
   };
@@ -557,7 +514,13 @@ const ResumeUpload = () => {
                             </span>
                           ));
                         }
-                      } catch (e) {}
+                      } catch {
+                        return (
+                          <p className="text-sm font-semibold text-slate-400 py-2">
+                            No technical skills parsed. Click "Extract Skills" above to run AI parsing.
+                          </p>
+                        );
+                      }
                       return (
                         <p className="text-sm font-semibold text-slate-400 py-2">
                           No technical skills parsed. Click "Extract Skills" above to run AI parsing.

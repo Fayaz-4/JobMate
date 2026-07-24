@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Button from '../../components/Button.jsx'
 import Input from '../../components/Input.jsx'
@@ -24,20 +24,19 @@ const ResetPassword = () => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => (!token ? 'Invalid or missing reset token.' : ''))
   const [submitted, setSubmitted] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  useEffect(() => {
-    if (!token) {
-      setError('Invalid or missing reset token.')
-    }
-  }, [token])
-
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
+
+    if (!token) {
+      setError('Invalid or missing reset token.')
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
